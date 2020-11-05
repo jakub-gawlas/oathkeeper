@@ -1148,6 +1148,16 @@
             }
           ]
         },
+        "http": {
+          "title": "HTTP",
+          "description": "The [`http` authenticator](https://www.ory.sh/docs/oathkeeper/pipeline/authn#http).",
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "$ref": "#/definitions/handlerSwitch"
+            }
+          }
+        },
         "jwt": {
           "title": "JSON Web Token (jwt)",
           "description": "The [`jwt` authenticator](https://www.ory.sh/docs/oathkeeper/pipeline/authn#jwt).",

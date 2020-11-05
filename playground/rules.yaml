@@ -1,0 +1,23 @@
+- id: first-rule
+  upstream:
+    url: http://localhost:8080
+    strip_path: /test
+  match:
+    url: http://localhost:4455/test/<.*>
+    methods: [GET, POST]
+  authenticators:
+    - handler: http
+      config:
+        only_headers:
+          - X-Customer-Id
+        url: http://localhost:8080/authn
+        preserve_path: true
+        subject_from_header: X-Auth-User
+        non_empty_subject: true
+    - handler: unauthorized
+  authorizer:
+    handler: allow
+  mutators:
+    - handler: header
+  errors:
+    - handler: json

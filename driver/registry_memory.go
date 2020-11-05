@@ -353,6 +353,7 @@ func (r *RegistryMemory) prepareAuthn() {
 			authn.NewAuthenticatorOAuth2ClientCredentials(r.c),
 			authn.NewAuthenticatorOAuth2Introspection(r.c),
 			authn.NewAuthenticatorUnauthorized(r.c),
+			authn.NewAuthenticatorHttp(r.c),
 		}
 
 		r.authenticators = map[string]authn.Authenticator{}

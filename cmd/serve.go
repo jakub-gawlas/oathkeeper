@@ -45,7 +45,7 @@ on configuration options, open the configuration documentation:
 	Run: func(cmd *cobra.Command, args []string) {
 		logger = viperx.InitializeConfig("oathkeeper", "", logger)
 
-		watchAndValidateViper()
+		//watchAndValidateViper()
 		server.RunServe(x.Version, x.Commit, x.Date)(cmd, args)
 	},
 }

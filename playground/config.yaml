@@ -1,0 +1,30 @@
+access_rules:
+  repositories:
+    - file:///Users/jacob/github.com/jakub-gawlas/oathkeeper/playground/rules.yaml
+  matching_strategy: regexp
+
+authenticators:
+  http:
+    enabled: true
+  unauthorized:
+    enabled: true
+
+authorizers:
+  allow:
+    enabled: true
+
+mutators:
+  header:
+    enabled: true
+    config:
+      headers:
+        X-User: '{{ print .Subject }}'
+
+errors:
+  fallback:
+    - json
+  handlers:
+    json:
+      enabled: true
+      config:
+        verbose: true
