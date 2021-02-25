@@ -13,6 +13,8 @@
         url: http://localhost:8080/authn
         preserve_path: true
         subject_from_header: X-Auth-User
+        extra_from_header:
+          test: LOL
         non_empty_subject: true
     - handler: unauthorized
   authorizer:

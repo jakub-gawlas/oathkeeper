@@ -477,6 +477,14 @@
           "type": "string",
           "default": "extra"
         },
+        "extra_from_header": {
+          "title": "Extra object from headers",
+          "description": "The `extra` field in the ORY Oathkeeper authentication session is set using this JSON Path. Defaults to `extra`, and could be `@this` (for the root element), `foo.bar` (for key foo.bar), or any other valid GJSON path. See [GSJON Syntax](https://github.com/tidwall/gjson/blob/master/SYNTAX.md) for reference.",
+          "type": "object",
+          "items": {
+            "type": "string"
+          }
+        },
         "subject_from": {
           "title": "Subject JSON Path",
           "description": "The `subject` field in the ORY Oathkeeper authentication session is set using this JSON Path. Defaults to `subject`. See [GSJON Syntax](https://github.com/tidwall/gjson/blob/master/SYNTAX.md) for reference.",
@@ -501,6 +509,11 @@
           "description": "Require non-empty subject",
           "type": "boolean",
           "default": false
+        },
+        "extra_post_process": {
+          "title": "Extra post process",
+          "description": "Post process extra",
+          "type": "string"
         }
       },
       "required": [

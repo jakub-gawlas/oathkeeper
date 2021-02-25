@@ -1,7 +1,11 @@
 package authn
 
 import (
+	"bytes"
+	"compress/gzip"
+	"encoding/base64"
 	"encoding/json"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -28,14 +32,16 @@ type AuthenticatorHttpFilter struct {
 }
 
 type AuthenticatorHttpConfiguration struct {
-	OnlyHeaders       []string `json:"only_headers"`
-	URL               string   `json:"url"`
-	PreservePath      bool     `json:"preserve_path"`
-	PassStatuses      []int    `json:"pass_statuses"`
-	ExtraFrom         string   `json:"extra_from"`
-	SubjectFrom       string   `json:"subject_from"`
-	SubjectFromHeader string   `json:"subject_from_header"`
-	NonEmptySubject   bool     `json:"non_empty_subject"`
+	OnlyHeaders       []string          `json:"only_headers"`
+	URL               string            `json:"url"`
+	PreservePath      bool              `json:"preserve_path"`
+	PassStatuses      []int             `json:"pass_statuses"`
+	ExtraFrom         string            `json:"extra_from"`
+	ExtraFromHeader   map[string]string `json:"extra_from_header"`
+	SubjectFrom       string            `json:"subject_from"`
+	SubjectFromHeader string            `json:"subject_from_header"`
+	NonEmptySubject   bool              `json:"non_empty_subject"`
+	ExtraPostProcess  string            `json:"extra_post_process"`
 }
 
 type AuthenticatorHttp struct {
@@ -75,7 +81,7 @@ func (a *AuthenticatorHttp) Config(config json.RawMessage) (*AuthenticatorHttpCo
 		c.PassStatuses = []int{http.StatusOK}
 	}
 
-	if len(c.ExtraFrom) == 0 {
+	if len(c.ExtraFrom) == 0 && len(c.ExtraFromHeader) == 0 {
 		c.ExtraFrom = "extra"
 	}
 
@@ -103,7 +109,7 @@ func (a *AuthenticatorHttp) Authenticate(r *http.Request, session *Authenticatio
 
 	var (
 		subject string
-		extra   map[string]interface{}
+		extra   = map[string]interface{}{}
 	)
 
 	if len(cf.SubjectFrom) > 0 {
@@ -120,10 +126,22 @@ func (a *AuthenticatorHttp) Authenticate(r *http.Request, session *Authenticatio
 		if err = json.Unmarshal(extraRaw, &extra); err != nil {
 			return helper.ErrForbidden.WithReasonf("The configured extra_from GJSON path returned an error on JSON output: %s", err.Error()).WithDebugf("GJSON path: %s\nBody: %s\nResult: %s", cf.ExtraFrom, body, extraRaw).WithTrace(err)
 		}
+	} else if len(cf.ExtraFromHeader) > 0 {
+		extra = make(map[string]interface{}, len(cf.ExtraFromHeader))
+		for k, headerName := range cf.ExtraFromHeader {
+			extra[k] = header.Get(headerName)
+		}
 	}
 
 	if cf.NonEmptySubject && len(subject) == 0 {
 		return helper.ErrForbidden.WithReasonf("Extracted subject is empty")
+	}
+
+	switch cf.ExtraPostProcess {
+	case "base64":
+		d, _ := json.Marshal(extra)
+		b64 := base64.StdEncoding.EncodeToString(d)
+		extra["__base64"] = b64
 	}
 
 	subject = stringsx.Coalesce(subject, "null")
@@ -155,21 +173,50 @@ func forwardRequest(r *http.Request, rawURL string, preservePath bool, passStatu
 		reqUrl.Path = r.URL.Path
 	}
 
-	res, err := http.DefaultClient.Do(&http.Request{
+	req := &http.Request{
 		Method: r.Method,
 		URL:    reqUrl,
 		Header: r.Header,
-	})
+	}
+
+	if r.Body != nil {
+		body, err := ioutil.ReadAll(r.Body)
+		if err != nil {
+			return nil, nil, err
+		}
+		if err := r.Body.Close(); err != nil {
+			return nil, nil, err
+		}
+		req.Body = ioutil.NopCloser(bytes.NewBuffer(body))
+		r.Body = ioutil.NopCloser(bytes.NewBuffer(body))
+	}
+
+	res, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, nil, helper.ErrForbidden.WithReason(err.Error()).WithTrace(err)
 	}
 
 	for _, passStatus := range passStatuses {
 		if res.StatusCode == passStatus {
-			body, err := ioutil.ReadAll(res.Body)
+
+			var reader io.ReadCloser
+			switch res.Header.Get("Content-Encoding") {
+			case "gzip":
+				defer res.Body.Close()
+				reader, err = gzip.NewReader(res.Body)
+				if err != nil {
+					return json.RawMessage{}, nil, errors.WithStack(herodot.ErrInternalServerError.WithReasonf("Unable to fetch data from remote: gzip: %+v", err))
+				}
+			default:
+				reader = res.Body
+			}
+
+			defer reader.Close()
+			body, err := ioutil.ReadAll(reader)
 			if err != nil {
 				return json.RawMessage{}, nil, errors.WithStack(herodot.ErrInternalServerError.WithReasonf("Unable to fetch data from remote: %+v", err))
 			}
+
 			return body, res.Header, nil
 		}
 	}
