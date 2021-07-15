@@ -174,7 +174,7 @@ func (a *MutatorIDToken) Mutate(r *http.Request, session *authn.AuthenticationSe
 	}
 
 	if token, ok := a.tokenFromCache(c, session, templateClaims, ttl); ok {
-		session.SetHeader("Authorization", "Bearer "+token)
+		session.SetHeader("X-Token", "Bearer "+token)
 		return nil
 	}
 
@@ -198,7 +198,7 @@ func (a *MutatorIDToken) Mutate(r *http.Request, session *authn.AuthenticationSe
 	}
 
 	a.tokenToCache(c, session, templateClaims, ttl, exp, signed)
-	session.SetHeader("Authorization", "Bearer "+signed)
+	session.SetHeader("X-Token", "Bearer "+signed)
 	return nil
 }
 
